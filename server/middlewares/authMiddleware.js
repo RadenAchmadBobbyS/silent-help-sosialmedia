@@ -1,6 +1,6 @@
 const { verifyToken } = require("../utils/jwt");
 
-async function authMiddleware(req, res, next) {
+async function authMiddleware(req, res) {
     try {
         const { authorization } = req.headers;
 
@@ -13,12 +13,10 @@ async function authMiddleware(req, res, next) {
         const payload = verifyToken(token);
         console.log(`User ${payload.email} authenticated successfully`);
 
-        req.user = payload; // Attach user info to the request object
-        next();
+        return { user: payload }
     } catch (error) {
-        next(error);
+        console.log(error);
     }
 }
 
 module.exports = authMiddleware;
-// This middleware checks if the user is authenticated by verifying the JWT token.

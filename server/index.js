@@ -1,37 +1,34 @@
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const { Server } = require('socket.io');
-const { connectToDatabase } = require('./config/mongo');
-const authRoutes = require('./routes/authRoutes');
+const { ApolloServer } = require('@apollo/server');
+const { startStandaloneServer } = require('@apollo/server/standalone');
+const { ApolloServerPluginLandingPageGraphQLPlayground } = require('@apollo/server-plugin-landing-page-graphql-playground');
+const { verifyToken } = require('./utils/jwt');
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: '*' }
+const UserModel = require('./models/UserModel');
+
+const { typeDefs: userTypeDefs, resolvers: userResolvers } = require('./schemas/UserSchema');
+const { typeDefs: postTypeDefs, resolvers: postResolvers } = require('./schemas/PostSchema');
+const { typeDefs: followTypeDefs, resolvers: followResolvers } = require('./schemas/FollowSchema');
+const { typeDefs: helpTypeDefs, resolvers: helpResolvers } = require('./schemas/HelpSchema');
+
+const server = new ApolloServer({
+  typeDefs: [userTypeDefs, postTypeDefs, followTypeDefs, helpTypeDefs],
+  resolvers: [userResolvers, postResolvers, followResolvers, helpResolvers],
+  introspection: true,
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use("/auth", authRoutes);
-
-// Socket.io connection
-io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.id}`);
-
-    socket.on("disconnect", () => {
-        console.log(`User disconnected: ${socket.id}`);
-    });
-
-    // You can add more socket event listeners here
-})
-
-// Start the server
-connectToDatabase().then(() => {
-    const PORT = process.env.PORT || 3000;
-    server.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
-    }); 
-})
+startStandaloneServer(server, {
+  listen: { port: process.env.PORT || 3000, host: '0.0.0.0' },
+  context: async ({ req }) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) return {};
+    const rawToken = authorization.split(' ');
+    if (rawToken[0] !== 'Bearer' || !rawToken[1]) throw new Error('Invalid token');
+    const payload = verifyToken(rawToken[1]);
+    const user = await UserModel.getUserById(payload.id);
+    if (!user) throw new Error('Invalid token');
+    return { user };
+  },
+}).then(({ url }) => {
+  console.log(`🚀 Server running at ${url}`);
+});

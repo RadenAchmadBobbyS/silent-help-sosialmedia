@@ -23,3 +23,5 @@ function errorHandler(err, req, res, next) {
     // Set the response status code and send a JSON response
     res.status(500).json({ message: 'Internal Server Error' });
 }
+
+module.exports = errorHandler;
