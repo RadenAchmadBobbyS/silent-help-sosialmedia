@@ -17,9 +17,11 @@ const typeDefs = `#graphql
     message: String
     audioUrl: String
     location: Location
+    riskLevel: String
+    deviceInfo: String
+    status: String
     createdAt: Date
     updatedAt: Date
-    status: String
   }
 
   input LocationInput {
@@ -28,11 +30,12 @@ const typeDefs = `#graphql
   }
 
   input CreateHelpInput {
-    userId: ID!
     triggerType: String!
     message: String
     audioUrl: String
     location: LocationInput
+    riskLevel: String
+    deviceInfo: String
   }
 
   type Query {
@@ -62,8 +65,15 @@ const resolvers = {
   Mutation: {
     createHelpReport: async (_, { input }, context) => {
       if (!context.user) throw new Error('Unauthorized');
-      if (input.userId !== context.user._id) throw new Error('Forbidden');
-      return await HelpModel.createHelpReport(input);
+      const report = await HelpModel.createHelpReport(input, context.user._id);
+      
+      // Ambil data user untuk nomor darurat
+      const user = await context.user;
+      const emergencyPhone = user.emergencyPhone || user.emergencyContact || user.phone || null;
+      if (context.io && context.io.notifyEmergencyContact && emergencyPhone) {
+        context.io.notifyEmergencyContact(emergencyPhone, report);
+      }
+      return report;
     },
     updateHelpReportStatus: async (_, { id, status }, context) => {
       if (!context.user) throw new Error('Unauthorized');

@@ -12,6 +12,7 @@ const typeDefs = `#graphql
         username: String
         email: String
         password: String
+        emergencyPhone: String
         followerUsers: [FollowersUsers]
         followingUsers: [FollowingUsers]
         posts: [Post]
@@ -49,7 +50,7 @@ const typeDefs = `#graphql
     }
 
     type Mutation {
-        register(name: String!, username: String!, email: String!, password: String!): User
+        register(name: String!, username: String!, email: String!, password: String!, emergencyPhone: String!): User
         login(identifier: String!, password: String!): AuthPayload
         followUser(followingId: ID!): String
     }
@@ -74,7 +75,7 @@ const resolvers = {
     },
 
     Mutation: {
-        register: async(_, { name, username, email, password }) => {
+        register: async(_, { name, username, email, password, emergencyPhone }) => {
             const existingEmail = await UserModel.getUserByEmail(email);
             if (existingEmail) throw new Error('Email already exists');
 
@@ -87,7 +88,7 @@ const resolvers = {
             if (password.length < 5) throw new Error('Password must be at least 5 characters')
 
             const hashed = hashPassword(password);
-            const newUser = { name, username, email, password: hashed };
+            const newUser = { name, username, email, password: hashed, emergencyPhone };
 
             await UserModel.register(newUser);
             return newUser;

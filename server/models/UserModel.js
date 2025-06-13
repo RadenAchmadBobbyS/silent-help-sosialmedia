@@ -1,7 +1,5 @@
 const { ObjectId } = require("mongodb");
 const database = require("../config/mongo");
-const { connectToDatabase } = require("../config/mongo");
-
 
 class UserModel {
     static async register(newUser) {

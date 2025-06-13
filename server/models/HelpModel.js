@@ -1,15 +1,15 @@
 const { ObjectId } = require("mongodb");
-const { getDatabase } = require("../config/mongo");
+const database = require("../config/mongo");
 
 class HelpModel {
   static collection() {
-    return getDatabase().collection("helpReports");
+    return database.collection("helpReports");
   }
 
   static async createHelpReport(input) {
     const newReport = {
       userId: new ObjectId(input.userId),
-      triggerType: input.triggerType, // "gesture" | "ai" | "wearable"
+      triggerType: input.triggerType,
       message: input.message || null,
       audioUrl: input.audioUrl || null,
       location: input.location
@@ -18,8 +18,8 @@ class HelpModel {
             lng: input.location.lng,
           }
         : null,
-      riskLevel: input.riskLevel || null, // "low" | "medium" | "high"
-      deviceInfo: input.deviceInfo || null, // { type, os, model }
+      riskLevel: input.riskLevel || null, 
+      deviceInfo: input.deviceInfo || "unknown",
       status: "pending", // default status
       createdAt: new Date(),
       updatedAt: new Date(),

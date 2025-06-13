@@ -1,34 +1,60 @@
+// index.js
 require('dotenv').config();
+const express = require('express');
+const http = require('http');
 const { ApolloServer } = require('@apollo/server');
-const { startStandaloneServer } = require('@apollo/server/standalone');
-const { ApolloServerPluginLandingPageGraphQLPlayground } = require('@apollo/server-plugin-landing-page-graphql-playground');
+const { expressMiddleware } = require('@apollo/server/express4');
 const { verifyToken } = require('./utils/jwt');
+const { Server } = require('socket.io');
 
+const cors = require('cors');
+const socketHandler = require('./sockets/socketHandler');
 const UserModel = require('./models/UserModel');
 
+// GraphQL schemas
 const { typeDefs: userTypeDefs, resolvers: userResolvers } = require('./schemas/UserSchema');
 const { typeDefs: postTypeDefs, resolvers: postResolvers } = require('./schemas/PostSchema');
 const { typeDefs: followTypeDefs, resolvers: followResolvers } = require('./schemas/FollowSchema');
 const { typeDefs: helpTypeDefs, resolvers: helpResolvers } = require('./schemas/HelpSchema');
 
-const server = new ApolloServer({
-  typeDefs: [userTypeDefs, postTypeDefs, followTypeDefs, helpTypeDefs],
-  resolvers: [userResolvers, postResolvers, followResolvers, helpResolvers],
-  introspection: true,
-});
+(async () => {
+  const app = express();
+  const httpServer = http.createServer(app);
 
-startStandaloneServer(server, {
-  listen: { port: process.env.PORT || 3000, host: '0.0.0.0' },
-  context: async ({ req }) => {
-    const authorization = req.headers.authorization;
-    if (!authorization) return {};
-    const rawToken = authorization.split(' ');
-    if (rawToken[0] !== 'Bearer' || !rawToken[1]) throw new Error('Invalid token');
-    const payload = verifyToken(rawToken[1]);
-    const user = await UserModel.getUserById(payload.id);
-    if (!user) throw new Error('Invalid token');
-    return { user };
-  },
-}).then(({ url }) => {
-  console.log(`🚀 Server running at ${url}`);
-});
+  // Setup middleware
+  app.use(cors());
+  app.use(express.json());
+
+  const apolloServer = new ApolloServer({
+    typeDefs: [userTypeDefs, postTypeDefs, followTypeDefs, helpTypeDefs],
+    resolvers: [userResolvers, postResolvers, followResolvers, helpResolvers],
+    introspection: true,
+  });
+
+  await apolloServer.start();
+
+  app.use('/graphql', expressMiddleware(apolloServer, {
+    context: async ({ req }) => {
+      const auth = req.headers.authorization || '';
+      const [bearer, token] = auth.split(' ');
+      if (bearer !== 'Bearer' || !token) return { io };
+      const payload = verifyToken(token);
+      const user = await UserModel.getUserById(payload.id);
+      return { user, io };
+    },
+  }));
+
+  // Socket.IO
+  const io = new Server(httpServer, {
+    cors: {
+      origin: '*',
+    },
+  });
+  socketHandler(io);
+  app.set('io', io);
+
+  const PORT = process.env.PORT || 3000;
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 GraphQL: http://localhost:${PORT}/graphql`);
+  });
+})();
